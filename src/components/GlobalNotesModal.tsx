@@ -51,18 +51,21 @@ export default function GlobalNotesModal({
   const [noteTitle, setNoteTitle] = useState('');
   const [noteContent, setNoteContent] = useState('');
   const [targetBookId, setTargetBookId] = useState<string>('general');
+  const [customCategoryInput, setCustomCategoryInput] = useState('');
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<{ id: string; bookId?: string } | null>(null);
 
   // Aggregate all notes from all books plus general notes
   const allNotes = useMemo(() => {
     const list: EnrichedNote[] = [];
 
-    // 1. General independent notes
+    // 1. General independent notes & Custom Notebooks
     generalNotes.forEach(gn => {
+      const isCustom = gn.bookTitle && gn.bookTitle !== 'Genel Notlar';
       list.push({
         ...gn,
-        bookId: 'general',
-        bookTitle: 'Genel Notlar'
+        bookId: gn.bookId || (isCustom ? `cat_${gn.bookTitle}` : 'general'),
+        bookTitle: gn.bookTitle || 'Genel Notlar'
       });
     });
 
@@ -81,6 +84,17 @@ export default function GlobalNotesModal({
 
     return list;
   }, [books, generalNotes]);
+
+  // Unique custom category titles created so far
+  const customCategories = useMemo(() => {
+    const set = new Set<string>();
+    generalNotes.forEach(gn => {
+      if (gn.bookTitle && gn.bookTitle !== 'Genel Notlar') {
+        set.add(gn.bookTitle);
+      }
+    });
+    return Array.from(set);
+  }, [generalNotes]);
 
   // Filtered and sorted notes
   const filteredNotes = useMemo(() => {
@@ -114,6 +128,8 @@ export default function GlobalNotesModal({
     setEditingNote(null);
     setNoteTitle('');
     setNoteContent('');
+    setCustomCategoryInput('');
+    setIsCustomCategory(false);
     setTargetBookId(selectedBookFilter !== 'all' ? selectedBookFilter : 'general');
     setIsFormOpen(true);
   };
@@ -122,7 +138,20 @@ export default function GlobalNotesModal({
     setEditingNote(note);
     setNoteTitle(note.title);
     setNoteContent(note.content);
-    setTargetBookId(note.bookId || 'general');
+    const isBook = books.some(b => b.id === note.bookId);
+    if (isBook) {
+      setTargetBookId(note.bookId || 'general');
+      setIsCustomCategory(false);
+      setCustomCategoryInput('');
+    } else if (note.bookTitle && note.bookTitle !== 'Genel Notlar') {
+      setTargetBookId('custom');
+      setIsCustomCategory(true);
+      setCustomCategoryInput(note.bookTitle);
+    } else {
+      setTargetBookId('general');
+      setIsCustomCategory(false);
+      setCustomCategoryInput('');
+    }
     setIsFormOpen(true);
   };
 
@@ -130,15 +159,35 @@ export default function GlobalNotesModal({
     e.preventDefault();
     if (!noteTitle.trim()) return;
 
+    let finalBookId: string | undefined = undefined;
+    let finalBookTitle: string | undefined = undefined;
+
+    if (isCustomCategory || targetBookId === 'custom') {
+      const catName = customCategoryInput.trim() || 'Özel Not Defteri';
+      finalBookId = `cat_${catName}`;
+      finalBookTitle = catName;
+    } else if (targetBookId.startsWith('cat_')) {
+      finalBookId = targetBookId;
+      finalBookTitle = targetBookId.replace('cat_', '');
+    } else if (targetBookId !== 'general') {
+      const selectedBook = books.find(b => b.id === targetBookId);
+      finalBookId = targetBookId;
+      finalBookTitle = selectedBook ? selectedBook.title : undefined;
+    } else {
+      finalBookId = 'general';
+      finalBookTitle = 'Genel Notlar';
+    }
+
     const noteToSave: Note = {
       id: editingNote ? editingNote.id : `note_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       title: noteTitle.trim(),
       content: noteContent.trim(),
       createdAt: editingNote ? editingNote.createdAt : Date.now(),
-      bookId: targetBookId !== 'general' ? targetBookId : undefined
+      bookId: finalBookId,
+      bookTitle: finalBookTitle
     };
 
-    onSaveNote(noteToSave, targetBookId);
+    onSaveNote(noteToSave, finalBookId);
     setIsFormOpen(false);
     setEditingNote(null);
   };
@@ -214,22 +263,42 @@ export default function GlobalNotesModal({
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
               {/* Book Filter Dropdown */}
-              <div className="relative flex-1 sm:w-56">
+              <div className="relative flex-1 sm:w-60">
                 <select
                   value={selectedBookFilter}
                   onChange={(e) => setSelectedBookFilter(e.target.value)}
                   className="w-full text-xs font-semibold px-3 py-2 bg-white border border-[#D9D1C2] rounded-xl text-slate-700 focus:outline-hidden focus:border-[#8B7E66] cursor-pointer shadow-xs truncate"
                 >
-                  <option value="all">Tüm Kitaplar & Notlar ({allNotes.length})</option>
-                  <option value="general">Genel Notlar ({generalNotes.length})</option>
-                  {books.map(b => {
-                    const count = b.notes?.length || 0;
-                    return (
-                      <option key={b.id} value={b.id}>
-                        {b.title} ({count})
-                      </option>
-                    );
-                  })}
+                  <option value="all">Tüm Notlar ({allNotes.length})</option>
+                  <option value="general">
+                    Genel Notlar ({allNotes.filter(n => n.bookId === 'general').length})
+                  </option>
+                  
+                  {/* Custom user-defined notebook groups */}
+                  {customCategories.length > 0 && (
+                    <optgroup label="Özel Not Defterleri">
+                      {customCategories.map(cat => {
+                        const count = allNotes.filter(n => n.bookTitle === cat).length;
+                        return (
+                          <option key={`cat_${cat}`} value={`cat_${cat}`}>
+                            📓 {cat} ({count})
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  )}
+
+                  {/* Registered Books */}
+                  <optgroup label="Kitaplar">
+                    {books.map(b => {
+                      const count = b.notes?.length || 0;
+                      return (
+                        <option key={b.id} value={b.id}>
+                          📖 {b.title} ({count})
+                        </option>
+                      );
+                    })}
+                  </optgroup>
                 </select>
               </div>
 
@@ -272,20 +341,88 @@ export default function GlobalNotesModal({
                   </button>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600">Ait Olduğu Kitap</label>
-                  <select
-                    value={targetBookId}
-                    onChange={(e) => setTargetBookId(e.target.value)}
-                    className="w-full text-xs font-semibold p-2 bg-stone-50 border border-[#D9D1C2] rounded-xl focus:outline-hidden focus:border-[#8B7E66]"
-                  >
-                    <option value="general">Genel / Bağımsız Not</option>
-                    {books.map(b => (
-                      <option key={b.id} value={b.id}>
-                        {b.title}
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-600">Ait Olduğu Kitap / Not Defteri</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomCategory(!isCustomCategory);
+                        if (!isCustomCategory) {
+                          setTargetBookId('custom');
+                        } else {
+                          setTargetBookId('general');
+                          setCustomCategoryInput('');
+                        }
+                      }}
+                      className="text-[10px] font-extrabold text-[#8B7E66] hover:text-[#70644e] cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" />
+                      {isCustomCategory ? 'Mevcut Listeden Seç' : 'Yeni Özel Başlık / Defter Oluştur'}
+                    </button>
+                  </div>
+
+                  {!isCustomCategory ? (
+                    <select
+                      value={targetBookId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === 'new_custom') {
+                          setIsCustomCategory(true);
+                          setTargetBookId('custom');
+                        } else {
+                          setTargetBookId(val);
+                        }
+                      }}
+                      className="w-full text-xs font-semibold p-2.5 bg-stone-50 border border-[#D9D1C2] rounded-xl focus:outline-hidden focus:border-[#8B7E66]"
+                    >
+                      <option value="general">Genel / Bağımsız Not</option>
+                      {customCategories.length > 0 && (
+                        <optgroup label="Özel Not Defterleriniz">
+                          {customCategories.map(cat => (
+                            <option key={`cat_${cat}`} value={`cat_${cat}`}>
+                              📓 {cat}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <optgroup label="Kitaplarınız">
+                        {books.map(b => (
+                          <option key={b.id} value={b.id}>
+                            📖 {b.title}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <option value="new_custom">✍️ + Yeni Özel Defter Adı Gir...</option>
+                    </select>
+                  ) : (
+                    <div className="space-y-1 animate-in fade-in">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={customCategoryInput}
+                          onChange={(e) => setCustomCategoryInput(e.target.value)}
+                          placeholder="Örn: Arapça Kelimeler, Fıkıh Notları, Günlük..."
+                          className="flex-1 text-xs font-bold p-2.5 bg-amber-50/50 border border-amber-300 rounded-xl focus:outline-hidden focus:ring-1 focus:ring-[#8B7E66] text-stone-800"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCustomCategory(false);
+                            setTargetBookId('general');
+                            setCustomCategoryInput('');
+                          }}
+                          className="px-2.5 py-2 text-[10px] font-bold text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl"
+                        >
+                          Listeye Dön
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-stone-400 italic">
+                        Girdiğiniz bu isim altında özel bir not defteri oluşturulur ve filtreden bu başlıkla seçilebilir.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1">

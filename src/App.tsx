@@ -270,16 +270,10 @@ export default function App() {
 
   // Global Notes Handlers
   const handleSaveGlobalNote = (noteToSave: Note, targetBookId?: string) => {
-    if (!targetBookId || targetBookId === 'general') {
-      setGeneralNotes(prev => {
-        const exists = prev.some(n => n.id === noteToSave.id);
-        const updated = exists 
-          ? prev.map(n => n.id === noteToSave.id ? noteToSave : n) 
-          : [noteToSave, ...prev];
-        localStorage.setItem('dualreader_general_notes', JSON.stringify(updated));
-        return updated;
-      });
-    } else {
+    // If targetBookId matches a real book id, save it inside that book
+    const isRealBook = targetBookId && targetBookId !== 'general' && books.some(b => b.id === targetBookId);
+
+    if (isRealBook) {
       setBooks(prevBooks => {
         const updatedBooks = prevBooks.map(b => {
           if (b.id === targetBookId) {
@@ -295,17 +289,23 @@ export default function App() {
         saveBooksToStorage(updatedBooks);
         return updatedBooks;
       });
+    } else {
+      // It is a general note or a custom note-category notebook (e.g. "Arapça Gramer Notlarım", "Ders Notları")
+      setGeneralNotes(prev => {
+        const exists = prev.some(n => n.id === noteToSave.id);
+        const updated = exists 
+          ? prev.map(n => n.id === noteToSave.id ? noteToSave : n) 
+          : [noteToSave, ...prev];
+        localStorage.setItem('dualreader_general_notes', JSON.stringify(updated));
+        return updated;
+      });
     }
   };
 
   const handleDeleteGlobalNote = (noteId: string, targetBookId?: string) => {
-    if (!targetBookId || targetBookId === 'general') {
-      setGeneralNotes(prev => {
-        const updated = prev.filter(n => n.id !== noteId);
-        localStorage.setItem('dualreader_general_notes', JSON.stringify(updated));
-        return updated;
-      });
-    } else {
+    const isRealBook = targetBookId && targetBookId !== 'general' && books.some(b => b.id === targetBookId);
+
+    if (isRealBook) {
       setBooks(prevBooks => {
         const updatedBooks = prevBooks.map(b => {
           if (b.id === targetBookId) {
@@ -315,6 +315,12 @@ export default function App() {
         });
         saveBooksToStorage(updatedBooks);
         return updatedBooks;
+      });
+    } else {
+      setGeneralNotes(prev => {
+        const updated = prev.filter(n => n.id !== noteId);
+        localStorage.setItem('dualreader_general_notes', JSON.stringify(updated));
+        return updated;
       });
     }
   };
