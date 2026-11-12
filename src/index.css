@@ -1,0 +1,105 @@
+@import url('https://fonts.googleapis.com/css2?family=Scheherazade+New:wght@400;500;600;700&family=Amiri+Quran&family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Merriweather:ital,wght@0,300;0,400;0,500;0,700;1,400;1,500&family=Roboto+Slab:wght@300;400;500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap');
+
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'ShaikhHamdullahMushaf';
+  src: url('/fonts/ShaikhHamdullahMushaf.woff2') format('woff2'),
+       url('/fonts/ShaikhHamdullahMushaf.woff') format('woff'),
+       url('/fonts/ShaikhHamdullahMushaf.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ShaikhHamdullahMushaf';
+  src: url('/fonts/ShaikhHamdullahMushaf.woff2') format('woff2'),
+       url('/fonts/ShaikhHamdullahMushaf.woff') format('woff'),
+       url('/fonts/ShaikhHamdullahMushaf.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --font-sans: 'Inter', sans-serif;
+  --font-shaikh-hamdullah: 'ShaikhHamdullahMushaf', serif;
+  --font-shaikh-hamdullah-bold: 'ShaikhHamdullahMushaf', serif;
+  --font-scheherazade: 'Scheherazade New', serif;
+  --font-lora: 'Lora', serif;
+  --font-playfair: 'Playfair Display', serif;
+  --font-merriweather: 'Merriweather', serif;
+  --font-roboto-slab: 'Roboto Slab', serif;
+  --font-eb-garamond: 'EB Garamond', serif;
+  
+  --color-warm-beige: #F5F2EA;
+  --color-warm-taupe: #8B7E66;
+  --color-warm-border: #D9D1C2;
+  --color-peach: #FF8A65;
+}
+
+/* Explicit font weight assignments for Shaikh Hamdullah fonts to guarantee Android/iOS WebView compatibility */
+.font-shaikh-hamdullah {
+  font-family: 'ShaikhHamdullahMushaf', serif !important;
+  font-weight: 400 !important;
+}
+
+.font-shaikh-hamdullah-bold {
+  font-family: 'ShaikhHamdullahMushaf', serif !important;
+  font-weight: 700 !important;
+}
+
+/* Custom scrollbar for desktop preview */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 126, 102, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 126, 102, 0.5);
+}
+
+body {
+  background-color: var(--color-warm-beige);
+  color: #2D2D2A;
+  font-family: 'Inter', sans-serif;
+  transition: background-color 0.3s ease;
+  -webkit-overflow-scrolling: touch;
+  -webkit-tap-highlight-color: transparent; /* Removes default touch gray shadow highlight on mobile */
+}
+
+/* Glassmorphism custom components */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.glass-panel-deep {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border: 1px solid var(--color-warm-border);
+}
+
+.glass-panel-header {
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-warm-border);
+}
+
+.glass-button-active {
+  background-color: var(--color-warm-taupe);
+  color: white;
+  box-shadow: 0 4px 14px 0 rgba(139, 126, 102, 0.2);
+}
+

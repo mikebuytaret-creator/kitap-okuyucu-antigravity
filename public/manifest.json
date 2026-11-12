@@ -1,0 +1,19 @@
+{
+  "name": "Kitap Okuyucum",
+  "short_name": "Kitap Okuyucum",
+  "description": "Kişiselleştirilebilir Arapça Türkçe Çift Dilli Kitap Okuyucu",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F2EA",
+  "theme_color": "#8B7E66",
+  "orientation": "any",
+  "categories": ["books", "education"],
+  "icons": [
+    {
+      "src": "https://img.icons8.com/isometric/512/book.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

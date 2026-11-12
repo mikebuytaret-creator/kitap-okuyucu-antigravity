@@ -1,0 +1,8 @@
+{
+  "name": "Kitap Okuyucum",
+  "description": "Çift dil destekli, özelleştirilebilir yazı tipi, büyüklük ve renk ayarları barındıran, JSON tabanlı kitap okuma uygulaması.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
