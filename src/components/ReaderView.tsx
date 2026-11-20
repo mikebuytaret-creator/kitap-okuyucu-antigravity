@@ -18,6 +18,7 @@ import {
   X,
   Minus,
   Plus,
+  Check,
   AlignJustify,
   AlignCenter,
   AlignLeft,
@@ -27,7 +28,9 @@ import {
   Trash2,
   FileEdit,
   Timer,
-  MoreVertical
+  MoreVertical,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { Book, Page, Deck } from '../types';
 import { READING_THEMES, LATIN_FONTS, ARABIC_FONTS } from '../constants';
@@ -69,6 +72,7 @@ export default function ReaderView({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [isAddingNote, setIsAddingNote] = useState(false);
+  const [isNoteMaximized, setIsNoteMaximized] = useState(false);
   const [newNoteTitle, setNewNoteTitle] = useState('');
   const [newNoteContent, setNewNoteContent] = useState('');
   const [expandedNotes, setExpandedNotes] = useState<string[]>([]);
@@ -147,6 +151,12 @@ export default function ReaderView({
       // Prioritize closing the topmost overlays first
       if (colorToDelete) {
         setColorToDelete(null);
+        markHandled();
+        return;
+      }
+      if (isAddingNote) {
+        setIsAddingNote(false);
+        setIsNoteMaximized(false);
         markHandled();
         return;
       }
@@ -1307,67 +1317,12 @@ export default function ReaderView({
               </div>
 
               <div className="flex-1 overflow-y-auto py-4 space-y-4">
-                {isAddingNote ? (
-                  <div className="bg-white/80 p-3 rounded-xl border border-[#8B7E66] shadow-sm flex flex-col gap-2">
-                    <textarea
-                      placeholder="Not Başlığı (Zorunlu)"
-                      value={newNoteTitle}
-                      onChange={(e) => setNewNoteTitle(e.target.value)}
-                      className="w-full text-sm font-bold text-slate-800 bg-transparent border-b border-[#D9D1C2] pb-1 focus:outline-hidden focus:border-[#8B7E66] resize-none h-16 whitespace-pre-wrap break-words"
-                      autoFocus
-                    />
-                    <textarea
-                      placeholder="Not Detayları (İsteğe bağlı)"
-                      value={newNoteContent}
-                      onChange={(e) => setNewNoteContent(e.target.value)}
-                      className="w-full text-xs text-slate-600 bg-transparent resize-none h-20 focus:outline-hidden whitespace-pre-wrap break-words"
-                    />
-                    <div className="flex items-center gap-2 mt-2">
-                      <button
-                        onClick={() => {
-                          if (!newNoteTitle.trim()) return;
-                          const newNote = {
-                            id: `note_${Date.now()}`,
-                            title: newNoteTitle.trim(),
-                            content: newNoteContent.trim(),
-                            createdAt: Date.now()
-                          };
-                          const updatedNotes = [...(book.notes || []), newNote];
-                          onUpdateBook({
-                            ...book,
-                            notes: updatedNotes
-                          });
-                          setNewNoteTitle('');
-                          setNewNoteContent('');
-                          setIsAddingNote(false);
-                        }}
-                        disabled={!newNoteTitle.trim()}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          newNoteTitle.trim() ? 'bg-[#8B7E66] text-white' : 'bg-stone-300 text-stone-500 cursor-not-allowed'
-                        }`}
-                      >
-                        Kaydet
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsAddingNote(false);
-                          setNewNoteTitle('');
-                          setNewNoteContent('');
-                        }}
-                        className="flex-1 py-1.5 bg-white border border-[#D9D1C2] rounded-lg text-xs font-bold text-stone-600 hover:bg-stone-50"
-                      >
-                        İptal
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setIsAddingNote(true)}
-                    className="w-full flex items-center justify-center gap-1.5 py-3 border border-dashed border-[#8B7E66] text-[#8B7E66] rounded-xl hover:bg-[#8B7E66]/5 transition-colors cursor-pointer text-xs font-bold"
-                  >
-                    <Plus className="w-4 h-4" /> Yeni Not Ekle
-                  </button>
-                )}
+                <button
+                  onClick={() => setIsAddingNote(true)}
+                  className="w-full flex items-center justify-center gap-1.5 py-3 border border-dashed border-[#8B7E66] text-[#8B7E66] rounded-xl hover:bg-[#8B7E66]/5 transition-colors cursor-pointer text-xs font-bold"
+                >
+                  <Plus className="w-4 h-4" /> Yeni Not Ekle
+                </button>
 
                 <div className="space-y-3">
                   {(book.notes && book.notes.length > 0) && (
@@ -1483,6 +1438,156 @@ export default function ReaderView({
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* In-Book Note Entry Overlay Dialog - Opens on Top of Notes Drawer */}
+      <AnimatePresence>
+        {isAddingNote && (
+          <div 
+            className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm"
+            onClick={() => {
+              setIsAddingNote(false);
+              setNewNoteTitle('');
+              setNewNoteContent('');
+              setIsNoteMaximized(false);
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className={`bg-[#FAF8F5] rounded-3xl border border-[#D9D1C2] shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
+                isNoteMaximized 
+                  ? 'w-full max-w-4xl h-[94vh] sm:h-[90vh]' 
+                  : 'w-full max-w-lg max-h-[90vh]'
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#D9D1C2] bg-white/70">
+                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <Edit3 className="w-4 h-4 text-[#8B7E66]" />
+                  <span>Yeni Not Ekle ({book.title})</span>
+                </h4>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsNoteMaximized(prev => !prev)}
+                    className="p-1.5 rounded-xl hover:bg-stone-200/60 text-stone-600 transition cursor-pointer"
+                    title={isNoteMaximized ? "Pencereyi Küçült" : "Pencereyi Büyüt (Uzun notlar için)"}
+                  >
+                    {isNoteMaximized ? (
+                      <Minimize2 className="w-4 h-4 text-[#8B7E66]" />
+                    ) : (
+                      <Maximize2 className="w-4 h-4 text-[#8B7E66]" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingNote(false);
+                      setNewNoteTitle('');
+                      setNewNoteContent('');
+                      setIsNoteMaximized(false);
+                    }}
+                    className="p-1.5 rounded-xl hover:bg-stone-200/60 text-stone-500 hover:text-stone-800 transition cursor-pointer"
+                    title="Vazgeç"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 flex-1 flex flex-col space-y-3.5 overflow-y-auto">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Not Başlığı</label>
+                  <input
+                    type="text"
+                    value={newNoteTitle}
+                    onChange={(e) => setNewNoteTitle(e.target.value)}
+                    placeholder="Not başlığını girin..."
+                    className="w-full text-xs font-bold p-2.5 bg-white border border-[#D9D1C2] rounded-xl focus:outline-hidden focus:border-[#8B7E66]"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="space-y-1 flex-1 flex flex-col min-h-0">
+                  <label className="text-xs font-bold text-slate-700">Not İçeriği</label>
+                  <textarea
+                    value={newNoteContent}
+                    onChange={(e) => setNewNoteContent(e.target.value)}
+                    placeholder="Not detaylarını buraya yazın..."
+                    className={`w-full text-xs p-3 bg-white border border-[#D9D1C2] rounded-xl focus:outline-hidden focus:border-[#8B7E66] leading-relaxed resize-y ${
+                      isNoteMaximized ? 'flex-1 min-h-[300px]' : 'min-h-[140px] max-h-[340px]'
+                    }`}
+                  />
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between pt-3 border-t border-[#D9D1C2]">
+                  <button
+                    type="button"
+                    onClick={() => setIsNoteMaximized(prev => !prev)}
+                    className="text-xs font-semibold text-[#8B7E66] hover:text-[#70644e] flex items-center gap-1 cursor-pointer"
+                  >
+                    {isNoteMaximized ? (
+                      <>
+                        <Minimize2 className="w-3.5 h-3.5" />
+                        <span>Küçült</span>
+                      </>
+                    ) : (
+                      <>
+                        <Maximize2 className="w-3.5 h-3.5" />
+                        <span>Pencereyi Büyüt</span>
+                      </>
+                    )}
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingNote(false);
+                        setNewNoteTitle('');
+                        setNewNoteContent('');
+                        setIsNoteMaximized(false);
+                      }}
+                      className="px-4 py-2 text-xs font-semibold bg-stone-100 text-stone-700 rounded-xl hover:bg-stone-200 cursor-pointer transition"
+                    >
+                      İptal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!newNoteTitle.trim()) return;
+                        const newNote = {
+                          id: `note_${Date.now()}`,
+                          title: newNoteTitle.trim(),
+                          content: newNoteContent.trim(),
+                          createdAt: Date.now()
+                        };
+                        const updatedNotes = [...(book.notes || []), newNote];
+                        onUpdateBook({
+                          ...book,
+                          notes: updatedNotes
+                        });
+                        setNewNoteTitle('');
+                        setNewNoteContent('');
+                        setIsAddingNote(false);
+                        setIsNoteMaximized(false);
+                      }}
+                      disabled={!newNoteTitle.trim()}
+                      className="px-5 py-2 text-xs font-bold text-white bg-[#8B7E66] hover:bg-[#746852] disabled:opacity-50 rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 transition active:scale-95"
+                    >
+                      <Check className="w-4 h-4" /> Kaydet
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
