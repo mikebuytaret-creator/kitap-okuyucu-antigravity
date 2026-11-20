@@ -381,6 +381,16 @@ export default function App() {
     setDecks(newDecks);
     saveBooksToStorage(newBooks);
     saveDecksToStorage(newDecks);
+    try {
+      const savedNotes = localStorage.getItem('dualreader_general_notes');
+      if (savedNotes) {
+        setGeneralNotes(JSON.parse(savedNotes));
+      }
+      const savedSettings = localStorage.getItem('dualreader_global_settings');
+      if (savedSettings) {
+        setGlobalSettings(JSON.parse(savedSettings));
+      }
+    } catch (e) {}
   };
 
   // Load demo pages out of the box for instantaneous offline sandbox test
