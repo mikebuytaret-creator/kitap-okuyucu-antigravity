@@ -26,7 +26,8 @@ import {
   ArrowDownUp,
   Trash2,
   FileEdit,
-  Timer
+  Timer,
+  MoreVertical
 } from 'lucide-react';
 import { Book, Page, Deck } from '../types';
 import { READING_THEMES, LATIN_FONTS, ARABIC_FONTS } from '../constants';
@@ -60,7 +61,9 @@ export default function ReaderView({
   const [isPagesDrawerOpen, setIsPagesDrawerOpen] = useState(false);
   const [isEditPageModalOpen, setIsEditPageModalOpen] = useState(false);
   const [isCounterOpen, setIsCounterOpen] = useState(false);
+  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const toolsMenuRef = useRef<HTMLDivElement>(null);
 
   // States for search & highlighting
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -113,6 +116,21 @@ export default function ReaderView({
   const [editingTurkishSize, setEditingTurkishSize] = useState(false);
   const [tempArabicSize, setTempArabicSize] = useState('');
   const [tempTurkishSize, setTempTurkishSize] = useState('');
+
+  // Close tools menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target as Node)) {
+        setIsToolsMenuOpen(false);
+      }
+    };
+    if (isToolsMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isToolsMenuOpen]);
 
   // Hardware Back Button Interception for Modals in Reader
   useEffect(() => {
@@ -825,53 +843,40 @@ export default function ReaderView({
 
   return (
     <div 
-      className={`min-h-[100dvh] transition-all duration-75 flex flex-col pb-24 ${currentTheme.bgColor || ''}`}
+      className={`min-h-[100dvh] transition-all duration-75 flex flex-col pb-24 overflow-x-hidden max-w-full ${currentTheme.bgColor || ''}`}
       style={{ backgroundColor: currentTheme.bgHex }}
     >
       
       {/* Top Floating bar */}
-      <header className={`sticky top-0 z-40 backdrop-blur-md bg-white/35 border-b border-[#D9D1C2]/60 ${currentTheme.textColor} px-4 pb-3 pt-[calc(1.25rem+env(safe-area-inset-top))] sm:pt-[calc(0.75rem+env(safe-area-inset-top))] flex flex-col gap-2.5 shadow-xs w-full`}>
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-3">
+      <header className={`sticky top-0 z-40 backdrop-blur-md bg-white/35 border-b border-[#D9D1C2]/60 ${currentTheme.textColor} px-3 sm:px-4 pb-3 pt-[calc(1.25rem+env(safe-area-inset-top))] sm:pt-[calc(0.75rem+env(safe-area-inset-top))] flex flex-col gap-2.5 shadow-xs w-full max-w-full overflow-hidden`}>
+        <div className="flex items-center justify-between w-full gap-2">
+          {/* Left section: Back button & Title (flex-1 to take available space and truncate gracefully) */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             <button
               id="reader-back-btn"
               onClick={handleBackAttempt}
-              className="p-2.5 rounded-xl bg-white/40 border border-[#D9D1C2]/40 hover:bg-white/70 hover:border-[#8B7E66] text-[#8B7E66] transition-all cursor-pointer"
+              className="p-2 sm:p-2.5 rounded-xl bg-white/40 border border-[#D9D1C2]/40 hover:bg-white/70 hover:border-[#8B7E66] text-[#8B7E66] transition-all cursor-pointer shrink-0"
               title="Kitaptan Çık"
             >
-              <ArrowLeft className="w-[22px] h-[22px]" />
+              <ArrowLeft className="w-5 h-5 sm:w-[22px] sm:h-[22px]" />
             </button>
-            <div className="min-w-0">
-              <h2 className="font-extrabold text-xs tracking-tight lg:text-sm truncate max-w-[130px] sm:max-w-[280px]">
+            <div className="min-w-0 flex-1">
+              <h2 className="font-extrabold text-xs sm:text-sm tracking-tight truncate" title={book.title}>
                 {book.title}
               </h2>
-              <p className="text-[10px] font-mono font-bold opacity-75 text-stone-600">
+              <p className="text-[10px] font-mono font-bold opacity-75 text-stone-600 truncate">
                 Sayfa {currentPage.page} / {pages[totalPages - 1].page}
               </p>
             </div>
           </div>
 
-          {/* Quick buttons */}
-          <div className="flex items-center gap-1.5 font-sans">
-            {/* In-page Word Search Toggle Button (Request #2) */}
-            <button
-              id="reader-search-toggle-btn"
-              onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
-                isSearchOpen 
-                  ? 'bg-[#8B7E66]/25 border-[#8B7E66] text-[#8B7E66] scale-105' 
-                  : 'bg-white/40 border-[#D9D1C2]/40 hover:bg-white/70 text-stone-600'
-              }`}
-              title="Sayfa İçi Kelime Ara"
-            >
-              <Search className="w-4 h-4" />
-            </button>
-
-            {/* Bookmark Button */}
+          {/* Quick buttons section: Bookmark & Notes always visible, others inside 3-dots on mobile */}
+          <div className="flex items-center gap-1 sm:gap-1.5 font-sans shrink-0">
+            {/* Bookmark Button (Always Visible) */}
             <button
               id="reader-bookmark-btn"
               onClick={handleToggleBookmark}
-              className={`p-2.5 rounded-xl border transition-all relative cursor-pointer ${
+              className={`p-2 sm:p-2.5 rounded-xl border transition-all relative cursor-pointer ${
                 isBookmarked 
                   ? 'bg-[#FF8A65]/20 border-[#FF8A65] text-[#FF8A65] scale-105 shadow-xs' 
                   : 'bg-white/40 border-[#D9D1C2]/40 hover:bg-white/70 text-stone-500'
@@ -886,11 +891,11 @@ export default function ReaderView({
               )}
             </button>
 
-            {/* Notes Button */}
+            {/* Notes Button (Always Visible) */}
             <button
               id="reader-notes-btn"
               onClick={() => setIsNotesOpen(true)}
-              className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+              className={`p-2 sm:p-2.5 rounded-xl border transition-all cursor-pointer ${
                 isNotesOpen
                   ? 'bg-[#8B7E66]/25 border-[#8B7E66] text-[#8B7E66] scale-105' 
                   : 'bg-white/40 border-[#D9D1C2]/40 hover:bg-white/70 text-stone-600'
@@ -900,40 +905,136 @@ export default function ReaderView({
               <Edit3 className="w-4 h-4" />
             </button>
 
-            {/* Quick page drawer button - Icon replaced with intuitive stack/layers (Request #1) */}
-            <button
-              id="reader-pages-drawer-btn"
-              onClick={() => setIsPagesDrawerOpen(true)}
-              className="p-2.5 rounded-xl bg-white/40 border border-[#D9D1C2]/40 hover:bg-white/70 text-stone-600 hover:border-[#8B7E66] transition-all cursor-pointer"
-              title="Tüm Sayfalar"
-            >
-              <Layers className="w-4 h-4" />
-            </button>
+            {/* Desktop Only buttons (Search, Pages Drawer, Edit Page, Counter) */}
+            <div className="hidden md:flex items-center gap-1.5">
+              {/* In-page Word Search */}
+              <button
+                id="reader-search-toggle-btn"
+                onClick={() => setIsSearchOpen(!isSearchOpen)}
+                className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+                  isSearchOpen 
+                    ? 'bg-[#8B7E66]/25 border-[#8B7E66] text-[#8B7E66] scale-105' 
+                    : 'bg-white/40 border-[#D9D1C2]/40 hover:bg-white/70 text-stone-600'
+                }`}
+                title="Sayfa İçi Kelime Ara"
+              >
+                <Search className="w-4 h-4" />
+              </button>
 
-            {/* Sayfayı Düzenle (Edit Page) button */}
-            <button
-              id="reader-edit-page-btn"
-              onClick={() => setIsEditPageModalOpen(true)}
-              className="p-2.5 rounded-xl bg-white/40 border border-[#D9D1C2]/40 hover:bg-white/70 hover:border-[#8B7E66] text-stone-600 hover:text-[#8B7E66] transition-all cursor-pointer"
-              title="Bu Sayfayı Düzenle / Araya Ekle"
-            >
-              <FileEdit className="w-4 h-4" />
-            </button>
+              {/* Pages drawer */}
+              <button
+                id="reader-pages-drawer-btn"
+                onClick={() => setIsPagesDrawerOpen(true)}
+                className="p-2.5 rounded-xl bg-white/40 border border-[#D9D1C2]/40 hover:bg-white/70 text-stone-600 hover:border-[#8B7E66] transition-all cursor-pointer"
+                title="Tüm Sayfalar"
+              >
+                <Layers className="w-4 h-4" />
+              </button>
 
-            {/* Sayaç (Counter) toggle button */}
-            <button
-              id="reader-counter-btn"
-              onClick={() => setIsCounterOpen(prev => !prev)}
-              className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
-                isCounterOpen 
-                  ? 'bg-[#8B7E66]/25 border-[#8B7E66] text-[#8B7E66] scale-105' 
-                  : 'bg-white/40 border-[#D9D1C2]/40 hover:bg-white/70 text-stone-600'
-              }`}
-              title="Mini Sayaç (Zaman & Aralık Ölçer)"
-            >
-              <Timer className="w-4 h-4" />
-            </button>
+              {/* Edit Page */}
+              <button
+                id="reader-edit-page-btn"
+                onClick={() => setIsEditPageModalOpen(true)}
+                className="p-2.5 rounded-xl bg-white/40 border border-[#D9D1C2]/40 hover:bg-white/70 hover:border-[#8B7E66] text-stone-600 hover:text-[#8B7E66] transition-all cursor-pointer"
+                title="Bu Sayfayı Düzenle / Araya Ekle"
+              >
+                <FileEdit className="w-4 h-4" />
+              </button>
 
+              {/* Counter */}
+              <button
+                id="reader-counter-btn"
+                onClick={() => setIsCounterOpen(prev => !prev)}
+                className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+                  isCounterOpen 
+                    ? 'bg-[#8B7E66]/25 border-[#8B7E66] text-[#8B7E66] scale-105' 
+                    : 'bg-white/40 border-[#D9D1C2]/40 hover:bg-white/70 text-stone-600'
+                }`}
+                title="Mini Sayaç (Zaman & Aralık Ölçer)"
+              >
+                <Timer className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Mobile "More Tools" (3 Dots / ⋯) Dropdown Menu */}
+            <div className="relative md:hidden" ref={toolsMenuRef}>
+              <button
+                id="reader-more-tools-btn"
+                onClick={() => setIsToolsMenuOpen(prev => !prev)}
+                className={`p-2 sm:p-2.5 rounded-xl border transition-all cursor-pointer ${
+                  isToolsMenuOpen || isSearchOpen || isCounterOpen
+                    ? 'bg-[#8B7E66]/25 border-[#8B7E66] text-[#8B7E66]' 
+                    : 'bg-white/40 border-[#D9D1C2]/40 hover:bg-white/70 text-stone-600'
+                }`}
+                title="Diğer Araçlar"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+
+              <AnimatePresence>
+                {isToolsMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 w-48 bg-white/95 backdrop-blur-md rounded-2xl border border-[#D9D1C2] shadow-xl p-1.5 z-50 flex flex-col gap-0.5 text-stone-700"
+                  >
+                    {/* Kelime Ara */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSearchOpen(prev => !prev);
+                        setIsToolsMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#8B7E66]/10 hover:text-[#8B7E66] transition text-left cursor-pointer"
+                    >
+                      <Search className="w-4 h-4 text-[#8B7E66]" />
+                      <span>{isSearchOpen ? 'Aramayı Kapat' : 'Sayfada Ara'}</span>
+                    </button>
+
+                    {/* Tüm Sayfalar */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPagesDrawerOpen(true);
+                        setIsToolsMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#8B7E66]/10 hover:text-[#8B7E66] transition text-left cursor-pointer"
+                    >
+                      <Layers className="w-4 h-4 text-[#8B7E66]" />
+                      <span>Tüm Sayfalar</span>
+                    </button>
+
+                    {/* Sayfayı Düzenle */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditPageModalOpen(true);
+                        setIsToolsMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#8B7E66]/10 hover:text-[#8B7E66] transition text-left cursor-pointer"
+                    >
+                      <FileEdit className="w-4 h-4 text-[#8B7E66]" />
+                      <span>Sayfayı Düzenle</span>
+                    </button>
+
+                    {/* Mini Sayaç */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCounterOpen(prev => !prev);
+                        setIsToolsMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#8B7E66]/10 hover:text-[#8B7E66] transition text-left cursor-pointer"
+                    >
+                      <Timer className="w-4 h-4 text-[#8B7E66]" />
+                      <span>{isCounterOpen ? 'Sayacı Kapat' : 'Mini Sayaç'}</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
           </div>
         </div>
