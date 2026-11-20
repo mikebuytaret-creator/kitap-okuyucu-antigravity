@@ -1534,7 +1534,7 @@ export default function ReaderView({
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-extrabold text-stone-500 uppercase tracking-wider">Okuma Teması</span>
                 <span className="text-[9px] font-mono text-stone-400">
-                  {READING_THEMES.find(t => t.id === settings.themeId)?.name || 'Tema'}
+                  {settings.customThemeColor ? 'Özel Renk' : (READING_THEMES.find(t => t.id === settings.themeId)?.name || 'Tema')}
                 </span>
               </div>
               {(() => {
@@ -1558,9 +1558,21 @@ export default function ReaderView({
                 const filteredThemes = READING_THEMES.filter(t => favoriteThemes.includes(t.id));
 
                 return (
-                  <div className="flex flex-wrap gap-2 pt-0.5 justify-start">
+                  <div className="flex flex-wrap gap-2 pt-0.5 justify-start items-center">
+                    {/* If customThemeColor exists, show it as an active first badge */}
+                    {settings.customThemeColor && (
+                      <div className="relative flex items-center justify-center" title="Mevcut Özel Renk">
+                        <div 
+                          className="w-6 h-6 rounded-full border ring-2 ring-[#8B7E66] ring-offset-2 border-[#8B7E66] scale-110 shadow-xs flex items-center justify-center"
+                          style={{ backgroundColor: settings.customThemeColor }}
+                        >
+                          <span className="text-[10px] font-black text-[#8B7E66]">✓</span>
+                        </div>
+                      </div>
+                    )}
+
                     {filteredThemes.map(t => {
-                      const isSelected = settings.themeId === t.id;
+                      const isSelected = !settings.customThemeColor && settings.themeId === t.id;
                       const isDark = ['night', 'slate', 'ocean', 'nordic'].includes(t.id);
                       return (
                         <button
@@ -1569,7 +1581,11 @@ export default function ReaderView({
                           onClick={() => {
                             onUpdateBook({
                               ...book,
-                              settings: { ...settings, themeId: t.id }
+                              settings: { 
+                                ...settings, 
+                                themeId: t.id,
+                                customThemeColor: undefined 
+                              }
                             });
                             handleQuickSettingsInteraction();
                           }}

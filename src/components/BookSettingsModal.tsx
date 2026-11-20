@@ -356,7 +356,7 @@ export default function BookSettingsModal({
                     </div>
 
                     {/* Manuel HEX Text Input */}
-                    <div className="relative flex-1">
+                    <div className="relative flex-1 flex items-center gap-1.5">
                       <input
                         type="text"
                         value={hexInput}
@@ -364,8 +364,9 @@ export default function BookSettingsModal({
                         onChange={(e) => {
                           const val = e.target.value;
                           setHexInput(val);
-                          if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(val.trim())) {
-                            handleUpdateCustomThemeColor(val.trim());
+                          const clean = val.trim().startsWith('#') ? val.trim() : '#' + val.trim();
+                          if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(clean)) {
+                            handleUpdateCustomThemeColor(clean);
                           }
                         }}
                         onBlur={() => {
@@ -379,18 +380,47 @@ export default function BookSettingsModal({
                             setHexInput(customThemeColor || currentTheme.bgHex || '#ffffff');
                           }
                         }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            let clean = hexInput.trim();
+                            if (clean && !clean.startsWith('#')) clean = '#' + clean;
+                            if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(clean)) {
+                              handleUpdateCustomThemeColor(clean);
+                            }
+                          }
+                        }}
                         className="w-full text-xs font-mono font-bold px-3 py-1.5 bg-white border border-stone-300 rounded-xl focus:outline-hidden focus:ring-1 focus:ring-[#8B7E66] text-stone-800 uppercase"
                       />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          let clean = hexInput.trim();
+                          if (clean && !clean.startsWith('#')) clean = '#' + clean;
+                          if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(clean)) {
+                            handleUpdateCustomThemeColor(clean);
+                          }
+                        }}
+                        className="px-2.5 py-1.5 bg-[#8B7E66] text-white text-[10px] font-bold rounded-xl hover:bg-[#746852] cursor-pointer shrink-0 transition"
+                      >
+                        Uygula
+                      </button>
                     </div>
 
                     {/* Canlı Önizleme Kutucuğu */}
                     <div 
-                      className="w-8 h-8 rounded-xl border border-stone-300 shadow-2xs shrink-0 flex items-center justify-center text-[10px] font-bold select-none"
+                      onClick={() => {
+                        let clean = hexInput.trim();
+                        if (clean && !clean.startsWith('#')) clean = '#' + clean;
+                        if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(clean)) {
+                          handleUpdateCustomThemeColor(clean);
+                        }
+                      }}
+                      className="w-8 h-8 rounded-xl border border-stone-300 shadow-2xs shrink-0 flex items-center justify-center text-[10px] font-bold select-none cursor-pointer"
                       style={{ 
                         backgroundColor: customThemeColor || currentTheme.bgHex || '#ffffff',
                         color: turkish.textColor || '#2D2D2A'
                       }}
-                      title="Seçili Arka Plan Önizlemesi"
+                      title="Seçili Arka Plan Önizlemesi - Uygulamak için tıklayın"
                     >
                       Aa
                     </div>
