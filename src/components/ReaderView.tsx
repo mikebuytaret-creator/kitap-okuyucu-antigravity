@@ -119,16 +119,18 @@ export default function ReaderView({
 
   // Close tools menu on click outside
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target as Node)) {
         setIsToolsMenuOpen(false);
       }
     };
     if (isToolsMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [isToolsMenuOpen]);
 
@@ -143,6 +145,11 @@ export default function ReaderView({
       };
 
       // Prioritize closing the topmost overlays first
+      if (isToolsMenuOpen) {
+        setIsToolsMenuOpen(false);
+        markHandled();
+        return;
+      }
       if (isNotesOpen) {
         setIsNotesOpen(false);
         markHandled();
@@ -843,12 +850,22 @@ export default function ReaderView({
 
   return (
     <div 
-      className={`min-h-[100dvh] transition-all duration-75 flex flex-col pb-24 overflow-x-hidden max-w-full ${currentTheme.bgColor || ''}`}
-      style={{ backgroundColor: currentTheme.bgHex }}
+      className={`min-h-[100dvh] transition-all duration-75 flex flex-col pb-24 max-w-full ${currentTheme.bgColor || ''}`}
+      style={{ 
+        backgroundColor: currentTheme.bgHex,
+        overflowX: 'clip'
+      }}
     >
       
-      {/* Top Floating bar */}
-      <header className={`sticky top-0 z-40 backdrop-blur-md bg-white/35 border-b border-[#D9D1C2]/60 ${currentTheme.textColor} px-3 sm:px-4 pb-3 pt-[calc(1.25rem+env(safe-area-inset-top))] sm:pt-[calc(0.75rem+env(safe-area-inset-top))] flex flex-col gap-2.5 shadow-xs w-full max-w-full overflow-hidden`}>
+      {/* Top Floating bar - Sticky at top, opaque/frosted theme background so scrolled text passes cleanly behind it */}
+      <header 
+        className={`sticky top-0 z-40 backdrop-blur-md border-b border-[#D9D1C2]/60 ${currentTheme.textColor} px-3 sm:px-4 pb-3 pt-[calc(1.25rem+env(safe-area-inset-top))] sm:pt-[calc(0.75rem+env(safe-area-inset-top))] flex flex-col gap-2.5 shadow-xs w-full max-w-full overflow-visible`}
+        style={{
+          backgroundColor: currentTheme.bgHex 
+            ? (currentTheme.bgHex.startsWith('#') && currentTheme.bgHex.length === 7 ? `${currentTheme.bgHex}F5` : currentTheme.bgHex)
+            : 'rgba(255, 255, 255, 0.95)'
+        }}
+      >
         <div className="flex items-center justify-between w-full gap-2">
           {/* Left section: Back button & Title (flex-1 to take available space and truncate gracefully) */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
@@ -957,7 +974,7 @@ export default function ReaderView({
             </div>
 
             {/* Mobile "More Tools" (3 Dots / ⋯) Dropdown Menu */}
-            <div className="relative md:hidden" ref={toolsMenuRef}>
+            <div className="relative md:hidden z-50" ref={toolsMenuRef}>
               <button
                 id="reader-more-tools-btn"
                 onClick={() => setIsToolsMenuOpen(prev => !prev)}
@@ -978,7 +995,7 @@ export default function ReaderView({
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: -5 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full mt-2 w-48 bg-white/95 backdrop-blur-md rounded-2xl border border-[#D9D1C2] shadow-xl p-1.5 z-50 flex flex-col gap-0.5 text-stone-700"
+                    className="absolute right-0 top-full mt-2 w-52 bg-[#FAF8F5]/98 backdrop-blur-xl rounded-2xl border border-[#D9D1C2] shadow-2xl p-1.5 z-[60] flex flex-col gap-0.5 text-stone-700 select-none"
                   >
                     {/* Kelime Ara */}
                     <button
@@ -987,7 +1004,7 @@ export default function ReaderView({
                         setIsSearchOpen(prev => !prev);
                         setIsToolsMenuOpen(false);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#8B7E66]/10 hover:text-[#8B7E66] transition text-left cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#8B7E66]/10 active:bg-[#8B7E66]/20 hover:text-[#8B7E66] transition text-left cursor-pointer"
                     >
                       <Search className="w-4 h-4 text-[#8B7E66]" />
                       <span>{isSearchOpen ? 'Aramayı Kapat' : 'Sayfada Ara'}</span>
@@ -1000,7 +1017,7 @@ export default function ReaderView({
                         setIsPagesDrawerOpen(true);
                         setIsToolsMenuOpen(false);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#8B7E66]/10 hover:text-[#8B7E66] transition text-left cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#8B7E66]/10 active:bg-[#8B7E66]/20 hover:text-[#8B7E66] transition text-left cursor-pointer"
                     >
                       <Layers className="w-4 h-4 text-[#8B7E66]" />
                       <span>Tüm Sayfalar</span>
@@ -1013,7 +1030,7 @@ export default function ReaderView({
                         setIsEditPageModalOpen(true);
                         setIsToolsMenuOpen(false);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#8B7E66]/10 hover:text-[#8B7E66] transition text-left cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#8B7E66]/10 active:bg-[#8B7E66]/20 hover:text-[#8B7E66] transition text-left cursor-pointer"
                     >
                       <FileEdit className="w-4 h-4 text-[#8B7E66]" />
                       <span>Sayfayı Düzenle</span>
@@ -1026,7 +1043,7 @@ export default function ReaderView({
                         setIsCounterOpen(prev => !prev);
                         setIsToolsMenuOpen(false);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#8B7E66]/10 hover:text-[#8B7E66] transition text-left cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold hover:bg-[#8B7E66]/10 active:bg-[#8B7E66]/20 hover:text-[#8B7E66] transition text-left cursor-pointer"
                     >
                       <Timer className="w-4 h-4 text-[#8B7E66]" />
                       <span>{isCounterOpen ? 'Sayacı Kapat' : 'Mini Sayaç'}</span>
