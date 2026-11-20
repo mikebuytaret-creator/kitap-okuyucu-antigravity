@@ -34,7 +34,7 @@ import { READING_THEMES, LATIN_FONTS, ARABIC_FONTS } from '../constants';
 import BookSettingsModal from './BookSettingsModal';
 import EditPageModal from './EditPageModal';
 import MiniCounter from './MiniCounter';
-import { normalizeText, findNormalizedMatches, ARABIC_SEPARATOR_REGEX, isArabicSeparator } from '../utils';
+import { normalizeText, findNormalizedMatches, ARABIC_SEPARATOR_REGEX, isArabicSeparator, getCustomThemes, removeCustomTheme, isDarkHex } from '../utils';
 
 interface ReaderViewProps {
   book: Book;
@@ -145,6 +145,11 @@ export default function ReaderView({
       };
 
       // Prioritize closing the topmost overlays first
+      if (colorToDelete) {
+        setColorToDelete(null);
+        markHandled();
+        return;
+      }
       if (isToolsMenuOpen) {
         setIsToolsMenuOpen(false);
         markHandled();
@@ -235,11 +240,58 @@ export default function ReaderView({
 
   const { pages, settings } = book;
   const baseTheme = READING_THEMES.find(t => t.id === settings.themeId) || READING_THEMES[0];
+  const isCustomDark = settings.customThemeColor ? isDarkHex(settings.customThemeColor) : false;
   const currentTheme = settings.customThemeColor ? {
     ...baseTheme,
     bgHex: settings.customThemeColor,
     bgColor: '',
+    textColor: isCustomDark ? 'text-stone-100' : 'text-stone-800',
+    borderColor: isCustomDark ? 'border-stone-700/60' : 'border-[#D9D1C2]/60'
   } : baseTheme;
+
+  const [customThemes, setCustomThemes] = useState<string[]>(() => getCustomThemes());
+  const [colorToDelete, setColorToDelete] = useState<string | null>(null);
+  const readerLongPressRef = useRef<any>(null);
+
+  const startReaderLongPress = (hex: string) => {
+    cancelReaderLongPress();
+    readerLongPressRef.current = setTimeout(() => {
+      setColorToDelete(hex);
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(30);
+      }
+    }, 500);
+  };
+
+  const cancelReaderLongPress = () => {
+    if (readerLongPressRef.current) {
+      clearTimeout(readerLongPressRef.current);
+      readerLongPressRef.current = null;
+    }
+  };
+
+  const handleDeleteCustomColor = (hexToDelete: string) => {
+    const updated = removeCustomTheme(hexToDelete);
+    setCustomThemes(updated);
+    setColorToDelete(null);
+
+    if (settings.customThemeColor?.toLowerCase() === hexToDelete.toLowerCase()) {
+      onUpdateBook({
+        ...book,
+        settings: {
+          ...settings,
+          themeId: 'cream_1',
+          customThemeColor: undefined
+        }
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (showQuickSettings || !isSettingsOpen) {
+      setCustomThemes(getCustomThemes());
+    }
+  }, [showQuickSettings, isSettingsOpen]);
 
   // Local font size states to avoid heavy global react saves during drag gestures & wheel zooms
   const [localArabicFontSize, setLocalArabicFontSize] = useState(settings.arabic.fontSize);
@@ -1576,18 +1628,50 @@ export default function ReaderView({
 
                 return (
                   <div className="flex flex-wrap gap-2 pt-0.5 justify-start items-center">
-                    {/* If customThemeColor exists, show it as an active first badge */}
-                    {settings.customThemeColor && (
-                      <div className="relative flex items-center justify-center" title="Mevcut Özel Renk">
-                        <div 
-                          className="w-6 h-6 rounded-full border ring-2 ring-[#8B7E66] ring-offset-2 border-[#8B7E66] scale-110 shadow-xs flex items-center justify-center"
-                          style={{ backgroundColor: settings.customThemeColor }}
-                        >
-                          <span className="text-[10px] font-black text-[#8B7E66]">✓</span>
+                    {/* User's Custom Themes */}
+                    {customThemes.map(hex => {
+                      const isSelected = settings.customThemeColor?.toLowerCase() === hex.toLowerCase();
+                      const isDark = isDarkHex(hex);
+                      return (
+                        <div key={hex} className="relative flex items-center justify-center p-0.5" title={`Özel Renk: ${hex.toUpperCase()} (Silmek için basılı tutun)`}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onUpdateBook({
+                                ...book,
+                                settings: {
+                                  ...settings,
+                                  customThemeColor: hex
+                                }
+                              });
+                              handleQuickSettingsInteraction();
+                            }}
+                            onTouchStart={() => startReaderLongPress(hex)}
+                            onTouchEnd={cancelReaderLongPress}
+                            onTouchMove={cancelReaderLongPress}
+                            onMouseDown={() => startReaderLongPress(hex)}
+                            onMouseUp={cancelReaderLongPress}
+                            onMouseLeave={cancelReaderLongPress}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              setColorToDelete(hex);
+                            }}
+                            className={`w-6 h-6 rounded-full border transition-all cursor-pointer relative ${
+                              isSelected 
+                                ? 'ring-2 ring-[#8B7E66] ring-offset-2 border-[#8B7E66] scale-110 shadow-xs' 
+                                : isDark ? 'border-zinc-700 hover:scale-105' : 'border-stone-300 hover:scale-105'
+                            }`}
+                            style={{ backgroundColor: hex }}
+                          >
+                            {isSelected && (
+                              <span className={`absolute inset-0 flex items-center justify-center text-[10px] font-black ${isDark ? 'text-white' : 'text-[#8B7E66]'}`}>✓</span>
+                            )}
+                          </button>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })}
 
+                    {/* Preset Themes */}
                     {filteredThemes.map(t => {
                       const isSelected = !settings.customThemeColor && settings.themeId === t.id;
                       const isDark = ['night', 'slate', 'ocean', 'nordic'].includes(t.id);
@@ -2382,6 +2466,53 @@ export default function ReaderView({
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Theme Color Delete Confirmation Dialog */}
+      <AnimatePresence>
+        {colorToDelete && (
+          <div 
+            className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs"
+            onClick={() => setColorToDelete(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className="bg-[#FAF8F5] rounded-3xl border border-[#D9D1C2] p-5 max-w-xs w-full shadow-2xl flex flex-col items-center gap-3 text-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div 
+                className="w-12 h-12 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs font-bold"
+                style={{ backgroundColor: colorToDelete }}
+              >
+                <span className={isDarkHex(colorToDelete) ? 'text-white' : 'text-stone-800'}>Aa</span>
+              </div>
+              <div>
+                <h4 className="font-extrabold text-sm text-stone-800">Özel Rengi Sil</h4>
+                <p className="text-xs text-stone-500 font-mono mt-0.5 uppercase">{colorToDelete}</p>
+                <p className="text-[11px] text-stone-600 mt-1.5 leading-normal">Bu rengi tema listenizden silmek istediğinize emin misiniz?</p>
+              </div>
+              <div className="flex items-center gap-2 w-full pt-1">
+                <button
+                  type="button"
+                  onClick={() => setColorToDelete(null)}
+                  className="flex-1 py-2 rounded-xl border border-stone-300 text-xs font-bold text-stone-600 hover:bg-stone-100 transition cursor-pointer"
+                >
+                  Vazgeç
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCustomColor(colorToDelete)}
+                  className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                >
+                  Sil
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 

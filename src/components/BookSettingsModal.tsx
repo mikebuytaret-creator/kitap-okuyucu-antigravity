@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Settings, Paintbrush, Eye, ChevronDown, ChevronUp, Download, Upload, AlertCircle, ClipboardCheck, Star, Plus, Copy, Share2, RotateCcw, CheckCheck, BookOpen, AlignLeft } from 'lucide-react';
+import { X, Settings, Paintbrush, Eye, ChevronDown, ChevronUp, Download, Upload, AlertCircle, ClipboardCheck, Star, Plus, Copy, Share2, RotateCcw, CheckCheck, BookOpen, AlignLeft, Check, Trash2 } from 'lucide-react';
 import { 
   READING_THEMES, 
   LATIN_FONTS, 
@@ -16,7 +16,7 @@ import {
   ARABIC_SEPARATOR_COLORS 
 } from '../constants';
 import { Book, LanguageSettings, Deck, AppBackupData, ReadingTheme } from '../types';
-import { copyToClipboard, downloadFile, createFullBackupPayload, restoreBackupMetadata } from '../utils';
+import { copyToClipboard, downloadFile, createFullBackupPayload, restoreBackupMetadata, getCustomThemes, addCustomTheme, removeCustomTheme, isDarkHex } from '../utils';
 
 interface BookSettingsModalProps {
   isOpen: boolean;
@@ -141,6 +141,27 @@ export default function BookSettingsModal({
   } : baseTheme;
 
   const [hexInput, setHexInput] = useState(customThemeColor || baseTheme.bgHex || '#ffffff');
+  const [customThemes, setCustomThemes] = useState<string[]>(() => getCustomThemes());
+  const [colorToDelete, setColorToDelete] = useState<string | null>(null);
+  const [themeAddedToast, setThemeAddedToast] = useState(false);
+  const longPressTimerRef = useRef<any>(null);
+
+  const startLongPress = (hex: string) => {
+    cancelLongPress();
+    longPressTimerRef.current = setTimeout(() => {
+      setColorToDelete(hex);
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(30);
+      }
+    }, 500);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
 
   const handleUpdateTheme = (newThemeId: string) => {
     const selected = READING_THEMES.find(t => t.id === newThemeId);
@@ -149,8 +170,59 @@ export default function BookSettingsModal({
       themeId: newThemeId,
       customThemeColor: undefined
     });
+    if (isGlobalModal && onApplyToAllBooks) {
+      onApplyToAllBooks({
+        ...book.settings,
+        themeId: newThemeId,
+        customThemeColor: undefined
+      });
+    }
     if (selected?.bgHex) {
       setHexInput(selected.bgHex);
+    }
+  };
+
+  const handleAddNewCustomColor = (colorHex: string) => {
+    let clean = colorHex.trim();
+    if (!clean.startsWith('#')) clean = '#' + clean;
+    if (!/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(clean)) return;
+
+    clean = clean.toLowerCase();
+    const updated = addCustomTheme(clean);
+    setCustomThemes(updated);
+    setHexInput(clean);
+
+    onUpdateSettings({
+      ...book.settings,
+      customThemeColor: clean
+    });
+
+    if (isGlobalModal && onApplyToAllBooks) {
+      onApplyToAllBooks({
+        ...book.settings,
+        customThemeColor: clean
+      });
+    }
+
+    setThemeAddedToast(true);
+    setTimeout(() => setThemeAddedToast(false), 2500);
+  };
+
+  const handleDeleteCustomColor = (hexToDelete: string) => {
+    const updated = removeCustomTheme(hexToDelete);
+    setCustomThemes(updated);
+    setColorToDelete(null);
+
+    // If current active color is the deleted one, revert to default theme
+    if (customThemeColor?.toLowerCase() === hexToDelete.toLowerCase()) {
+      handleUpdateTheme('cream_1');
+      if (isGlobalModal && onApplyToAllBooks) {
+        onApplyToAllBooks({
+          ...book.settings,
+          themeId: 'cream_1',
+          customThemeColor: undefined
+        });
+      }
     }
   };
 
@@ -160,6 +232,12 @@ export default function BookSettingsModal({
       ...book.settings,
       customThemeColor: colorHex
     });
+    if (isGlobalModal && onApplyToAllBooks) {
+      onApplyToAllBooks({
+        ...book.settings,
+        customThemeColor: colorHex
+      });
+    }
   };
 
   const handleUpdateLanguage = (lang: 'turkish' | 'arabic', key: keyof LanguageSettings, value: any) => {
@@ -281,48 +359,129 @@ export default function BookSettingsModal({
             </button>
             {isThemeOpen && (
               <div className="mt-3 space-y-3 animate-in fade-in slide-in-from-top-1 duration-150">
-                <div id="theme-color-palette" className="grid grid-cols-6 sm:grid-cols-8 gap-2 p-2.5 bg-stone-100/50 rounded-2xl border border-stone-200/50">
-                  {READING_THEMES.map((theme) => {
-                    const isFav = favoriteThemes.includes(theme.id);
-                    const isSelected = !customThemeColor && themeId === theme.id;
-                    const isDark = ['night', 'slate', 'ocean', 'nordic'].includes(theme.id);
-                    return (
-                      <div 
-                        key={theme.id} 
-                        className="relative group flex items-center justify-center p-0.5"
-                      >
-                        <button
-                          id={`theme-btn-${theme.id}`}
-                          type="button"
-                          onClick={() => handleUpdateTheme(theme.id)}
-                          className={`w-9 sm:w-10 h-9 sm:h-10 rounded-full border shadow-xs transition-all cursor-pointer flex items-center justify-center relative ${
-                            isSelected 
-                              ? 'ring-2 ring-[#8B7E66] ring-offset-1 border-[#8B7E66] scale-110 shadow-sm z-10' 
-                              : 'border-stone-300 hover:scale-110 hover:border-stone-400'
-                          }`}
-                          style={{ backgroundColor: theme.bgHex }}
-                          title={theme.name}
-                        >
-                          {isSelected && (
-                            <span className={`text-[10px] font-extrabold ${isDark ? 'text-white' : 'text-[#8B7E66]'}`}>✓</span>
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite(theme.id);
-                          }}
-                          className={`absolute -top-1 -right-1 p-0.5 rounded-full transition-all cursor-pointer z-10 ${
-                            isFav ? 'text-amber-500 scale-110 animate-scale-up' : 'text-stone-400 hover:text-amber-500 opacity-0 group-hover:opacity-100'
-                          }`}
-                          title={isFav ? "Favorilerden Çıkar" : "Favorilere Ekle"}
-                        >
-                          <Star className={`w-3.5 h-3.5 ${isFav ? 'fill-current' : ''}`} />
-                        </button>
+                <div id="theme-color-palette" className="space-y-2.5">
+                  {/* User-added Custom Themes (if any) */}
+                  {customThemes.length > 0 && (
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-extrabold text-stone-500 uppercase tracking-wider block px-1">
+                        Eklediğiniz Özel Renkler (Silmek için basılı tutun)
+                      </span>
+                      <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 p-2.5 bg-amber-50/40 rounded-2xl border border-amber-200/50">
+                        {customThemes.map((hex) => {
+                          const isSelected = customThemeColor?.toLowerCase() === hex.toLowerCase();
+                          const isDark = isDarkHex(hex);
+                          return (
+                            <div 
+                              key={hex} 
+                              className="relative group flex items-center justify-center p-0.5"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onUpdateSettings({
+                                    ...book.settings,
+                                    customThemeColor: hex
+                                  });
+                                  if (isGlobalModal && onApplyToAllBooks) {
+                                    onApplyToAllBooks({
+                                      ...book.settings,
+                                      customThemeColor: hex
+                                    });
+                                  }
+                                  setHexInput(hex);
+                                }}
+                                onTouchStart={() => startLongPress(hex)}
+                                onTouchEnd={cancelLongPress}
+                                onTouchMove={cancelLongPress}
+                                onMouseDown={() => startLongPress(hex)}
+                                onMouseUp={cancelLongPress}
+                                onMouseLeave={cancelLongPress}
+                                onContextMenu={(e) => {
+                                  e.preventDefault();
+                                  setColorToDelete(hex);
+                                }}
+                                className={`w-9 sm:w-10 h-9 sm:h-10 rounded-full border shadow-xs transition-all cursor-pointer flex items-center justify-center relative ${
+                                  isSelected 
+                                    ? 'ring-2 ring-[#8B7E66] ring-offset-1 border-[#8B7E66] scale-110 shadow-sm z-10' 
+                                    : 'border-stone-300 hover:scale-110 hover:border-stone-400'
+                                }`}
+                                style={{ backgroundColor: hex }}
+                                title={`Özel Renk: ${hex.toUpperCase()} (Silmek için basılı tutun)`}
+                              >
+                                {isSelected && (
+                                  <span className={`text-[10px] font-extrabold ${isDark ? 'text-white' : 'text-[#8B7E66]'}`}>✓</span>
+                                )}
+                              </button>
+                              {/* Quick delete icon on hover for desktop */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setColorToDelete(hex);
+                                }}
+                                className="absolute -top-1 -right-1 p-0.5 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-all cursor-pointer z-10 opacity-0 group-hover:opacity-100 shadow-2xs"
+                                title="Bu özel rengi sil"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
+                    </div>
+                  )}
+
+                  {/* Standard Built-in Themes */}
+                  <div className="space-y-1">
+                    {customThemes.length > 0 && (
+                      <span className="text-[9px] font-extrabold text-stone-500 uppercase tracking-wider block px-1">
+                        Hazır Okuma Temaları
+                      </span>
+                    )}
+                    <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 p-2.5 bg-stone-100/50 rounded-2xl border border-stone-200/50">
+                      {READING_THEMES.map((theme) => {
+                        const isFav = favoriteThemes.includes(theme.id);
+                        const isSelected = !customThemeColor && themeId === theme.id;
+                        const isDark = ['night', 'slate', 'ocean', 'nordic'].includes(theme.id);
+                        return (
+                          <div 
+                            key={theme.id} 
+                            className="relative group flex items-center justify-center p-0.5"
+                          >
+                            <button
+                              id={`theme-btn-${theme.id}`}
+                              type="button"
+                              onClick={() => handleUpdateTheme(theme.id)}
+                              className={`w-9 sm:w-10 h-9 sm:h-10 rounded-full border shadow-xs transition-all cursor-pointer flex items-center justify-center relative ${
+                                isSelected 
+                                  ? 'ring-2 ring-[#8B7E66] ring-offset-1 border-[#8B7E66] scale-110 shadow-sm z-10' 
+                                  : 'border-stone-300 hover:scale-110 hover:border-stone-400'
+                              }`}
+                              style={{ backgroundColor: theme.bgHex }}
+                              title={theme.name}
+                            >
+                              {isSelected && (
+                                <span className={`text-[10px] font-extrabold ${isDark ? 'text-white' : 'text-[#8B7E66]'}`}>✓</span>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFavorite(theme.id);
+                              }}
+                              className={`absolute -top-1 -right-1 p-0.5 rounded-full transition-all cursor-pointer z-10 ${
+                                isFav ? 'text-amber-500 scale-110 animate-scale-up' : 'text-stone-400 hover:text-amber-500 opacity-0 group-hover:opacity-100'
+                              }`}
+                              title={isFav ? "Favorilerden Çıkar" : "Favorilere Ekle"}
+                            >
+                              <Star className={`w-3.5 h-3.5 ${isFav ? 'fill-current' : ''}`} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Manuel Renk Kodu Girişi ve Renk Seçici (Color Picker) */}
@@ -335,7 +494,7 @@ export default function BookSettingsModal({
                     {customThemeColor && (
                       <button
                         type="button"
-                        onClick={() => handleUpdateTheme(themeId)}
+                        onClick={() => handleUpdateTheme(themeId || 'cream_1')}
                         className="text-[9px] font-bold text-amber-700 hover:text-amber-900 underline cursor-pointer"
                       >
                         Temaya Sıfırla
@@ -348,8 +507,10 @@ export default function BookSettingsModal({
                     <div className="relative w-8 h-8 rounded-full border-2 border-white shadow-xs overflow-hidden shrink-0 cursor-pointer">
                       <input
                         type="color"
-                        value={customThemeColor || currentTheme.bgHex || '#ffffff'}
-                        onChange={(e) => handleUpdateCustomThemeColor(e.target.value)}
+                        value={hexInput.startsWith('#') && hexInput.length === 7 ? hexInput : (customThemeColor || currentTheme.bgHex || '#ffffff')}
+                        onChange={(e) => {
+                          setHexInput(e.target.value);
+                        }}
                         className="absolute inset-0 w-12 h-12 -top-2 -left-2 cursor-pointer border-0 p-0"
                         title="Renk Paletinden Seç"
                       />
@@ -361,70 +522,45 @@ export default function BookSettingsModal({
                         type="text"
                         value={hexInput}
                         placeholder="#f5f2ea"
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setHexInput(val);
-                          const clean = val.trim().startsWith('#') ? val.trim() : '#' + val.trim();
-                          if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(clean)) {
-                            handleUpdateCustomThemeColor(clean);
-                          }
-                        }}
-                        onBlur={() => {
-                          let clean = hexInput.trim();
-                          if (clean && !clean.startsWith('#')) {
-                            clean = '#' + clean;
-                          }
-                          if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(clean)) {
-                            handleUpdateCustomThemeColor(clean);
-                          } else {
-                            setHexInput(customThemeColor || currentTheme.bgHex || '#ffffff');
-                          }
-                        }}
+                        onChange={(e) => setHexInput(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                            let clean = hexInput.trim();
-                            if (clean && !clean.startsWith('#')) clean = '#' + clean;
-                            if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(clean)) {
-                              handleUpdateCustomThemeColor(clean);
-                            }
+                            handleAddNewCustomColor(hexInput);
                           }
                         }}
                         className="w-full text-xs font-mono font-bold px-3 py-1.5 bg-white border border-stone-300 rounded-xl focus:outline-hidden focus:ring-1 focus:ring-[#8B7E66] text-stone-800 uppercase"
                       />
                       <button
                         type="button"
-                        onClick={() => {
-                          let clean = hexInput.trim();
-                          if (clean && !clean.startsWith('#')) clean = '#' + clean;
-                          if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(clean)) {
-                            handleUpdateCustomThemeColor(clean);
-                          }
-                        }}
-                        className="px-2.5 py-1.5 bg-[#8B7E66] text-white text-[10px] font-bold rounded-xl hover:bg-[#746852] cursor-pointer shrink-0 transition"
+                        onClick={() => handleAddNewCustomColor(hexInput)}
+                        className="px-3 py-1.5 bg-[#8B7E66] text-white text-[11px] font-bold rounded-xl hover:bg-[#746852] active:scale-95 cursor-pointer shrink-0 transition shadow-xs flex items-center gap-1"
+                        title="Bu rengi temalarınıza ekleyin ve seçin"
                       >
-                        Uygula
+                        <Plus className="w-3.5 h-3.5" />
+                        Ekle
                       </button>
                     </div>
 
                     {/* Canlı Önizleme Kutucuğu */}
                     <div 
-                      onClick={() => {
-                        let clean = hexInput.trim();
-                        if (clean && !clean.startsWith('#')) clean = '#' + clean;
-                        if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(clean)) {
-                          handleUpdateCustomThemeColor(clean);
-                        }
-                      }}
-                      className="w-8 h-8 rounded-xl border border-stone-300 shadow-2xs shrink-0 flex items-center justify-center text-[10px] font-bold select-none cursor-pointer"
+                      onClick={() => handleAddNewCustomColor(hexInput)}
+                      className="w-8 h-8 rounded-xl border border-stone-300 shadow-2xs shrink-0 flex items-center justify-center text-[10px] font-bold select-none cursor-pointer hover:scale-105 transition"
                       style={{ 
-                        backgroundColor: customThemeColor || currentTheme.bgHex || '#ffffff',
-                        color: turkish.textColor || '#2D2D2A'
+                        backgroundColor: hexInput.startsWith('#') ? hexInput : (customThemeColor || currentTheme.bgHex || '#ffffff'),
+                        color: isDarkHex(hexInput.startsWith('#') ? hexInput : (customThemeColor || '#ffffff')) ? '#ffffff' : '#2D2D2A'
                       }}
-                      title="Seçili Arka Plan Önizlemesi - Uygulamak için tıklayın"
+                      title="Seçili Arka Plan Önizlemesi - Eklemek için tıklayın"
                     >
                       Aa
                     </div>
                   </div>
+
+                  {themeAddedToast && (
+                    <p className="text-[10px] font-bold text-emerald-600 animate-in fade-in duration-150 flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      Renk temalara eklendi ve seçildi!
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -1111,6 +1247,53 @@ export default function BookSettingsModal({
             </button>
           </motion.div>
         </motion.div>
+      )}
+    </AnimatePresence>
+
+    {/* Custom Theme Color Delete Confirmation Dialog */}
+    <AnimatePresence>
+      {colorToDelete && (
+        <div 
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs"
+          onClick={() => setColorToDelete(null)}
+        >
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+            className="bg-[#FAF8F5] rounded-3xl border border-[#D9D1C2] p-5 max-w-xs w-full shadow-2xl flex flex-col items-center gap-3 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div 
+              className="w-12 h-12 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs font-bold"
+              style={{ backgroundColor: colorToDelete }}
+            >
+              <span className={isDarkHex(colorToDelete) ? 'text-white' : 'text-stone-800'}>Aa</span>
+            </div>
+            <div>
+              <h4 className="font-extrabold text-sm text-stone-800">Özel Rengi Sil</h4>
+              <p className="text-xs text-stone-500 font-mono mt-0.5 uppercase">{colorToDelete}</p>
+              <p className="text-[11px] text-stone-600 mt-1.5 leading-normal">Bu rengi tema listenizden silmek istediğinize emin misiniz?</p>
+            </div>
+            <div className="flex items-center gap-2 w-full pt-1">
+              <button
+                type="button"
+                onClick={() => setColorToDelete(null)}
+                className="flex-1 py-2 rounded-xl border border-stone-300 text-xs font-bold text-stone-600 hover:bg-stone-100 transition cursor-pointer"
+              >
+                Vazgeç
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteCustomColor(colorToDelete)}
+                className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+              >
+                Sil
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </AnimatePresence>
     </>

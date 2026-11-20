@@ -71,6 +71,7 @@ export interface AppBackupData {
   generalNotes?: Note[];
   globalSettings?: Book['settings'];
   favoriteThemes?: string[];
+  customThemes?: string[]; // User-added custom theme hex codes
   counters?: Record<string, any>;
   exportedAt: number;
 }

@@ -60,6 +60,48 @@ function formatDelta(deltaMs: number | null): string {
   return `+${mins} dk ${remSec} sn`;
 }
 
+let sharedAudioCtx: AudioContext | null = null;
+
+function playCounterClickSound() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+      sharedAudioCtx = new AudioContextClass();
+    }
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume();
+    }
+    const ctx = sharedAudioCtx;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    // Natural mechanical tactile click
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(950, now);
+    osc.frequency.exponentialRampToValueAtTime(320, now + 0.035);
+
+    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.035);
+  } catch (e) {
+    // AudioContext might be blocked until user gesture, ignore
+  }
+
+  try {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(12);
+    }
+  } catch (e) {}
+}
+
 export default function MiniCounter({ bookId, isOpen, onClose }: MiniCounterProps) {
   const storageKey = `dualreader_counter_${bookId}`;
 
@@ -124,6 +166,9 @@ export default function MiniCounter({ bookId, isOpen, onClose }: MiniCounterProp
 
     const updatedLogs = [newLogItem, ...logs].slice(0, 200); // keep last 200 logs
     saveState(newCount, updatedLogs);
+
+    // Audio click & haptic feedback
+    playCounterClickSound();
 
     // Trigger visual pulse effect
     setTapEffect(true);
@@ -218,21 +263,18 @@ export default function MiniCounter({ bookId, isOpen, onClose }: MiniCounterProp
             </div>
           </div>
 
-          {/* MAIN COUNTER TAP AREA (+1 on click) */}
+          {/* MAIN COUNTER TAP AREA (Increments count on click) */}
           <div
             onClick={handleIncrement}
             className={`p-4 flex flex-col items-center justify-center cursor-pointer transition-all duration-75 active:scale-95 ${
               tapEffect ? 'bg-[#8B7E66]/25' : 'hover:bg-black/[0.02]'
             }`}
-            title="Artırmak için tıklayın (+1)"
+            title="Artırmak için tıklayın"
           >
             {/* Big Count Number */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center">
               <span className="text-4xl sm:text-5xl font-extrabold font-mono text-slate-800 tracking-tight drop-shadow-xs">
                 {count}
-              </span>
-              <span className="text-xs font-bold text-[#8B7E66] px-2 py-0.5 rounded-full bg-[#8B7E66]/15 border border-[#8B7E66]/30">
-                +1
               </span>
             </div>
 

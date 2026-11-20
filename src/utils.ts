@@ -670,13 +670,14 @@ export function createFullBackupPayload(books: Book[], decks: Deck[]): AppBackup
     generalNotes,
     globalSettings,
     favoriteThemes,
+    customThemes: getCustomThemes(),
     counters,
     exportedAt: Date.now()
   };
 }
 
 /**
- * Restores full backup metadata (general notes, global settings, favorite themes, counters)
+ * Restores full backup metadata (general notes, global settings, favorite themes, counters, customThemes)
  * into localStorage when importing a backup file.
  */
 export function restoreBackupMetadata(data: AppBackupData): void {
@@ -695,6 +696,11 @@ export function restoreBackupMetadata(data: AppBackupData): void {
       localStorage.setItem('favorite_themes', JSON.stringify(data.favoriteThemes));
     } catch (e) {}
   }
+  if (data.customThemes && Array.isArray(data.customThemes)) {
+    try {
+      localStorage.setItem('dualreader_custom_themes', JSON.stringify(data.customThemes));
+    } catch (e) {}
+  }
   if (data.counters && typeof data.counters === 'object') {
     try {
       Object.entries(data.counters).forEach(([key, val]) => {
@@ -706,6 +712,77 @@ export function restoreBackupMetadata(data: AppBackupData): void {
       });
     } catch (e) {}
   }
+}
+
+/**
+ * Checks whether a hex color is dark, based on standard perceived luminance formula.
+ */
+export function isDarkHex(hex: string): boolean {
+  if (!hex) return false;
+  const clean = hex.replace('#', '').trim();
+  let r = 255, g = 255, b = 255;
+  if (clean.length === 3) {
+    r = parseInt(clean[0] + clean[0], 16) || 255;
+    g = parseInt(clean[1] + clean[1], 16) || 255;
+    b = parseInt(clean[2] + clean[2], 16) || 255;
+  } else if (clean.length >= 6) {
+    r = parseInt(clean.substring(0, 2), 16) || 255;
+    g = parseInt(clean.substring(2, 4), 16) || 255;
+    b = parseInt(clean.substring(4, 6), 16) || 255;
+  }
+  return (r * 0.299 + g * 0.587 + b * 0.114) < 140;
+}
+
+/**
+ * Retrieves user custom theme colors from localStorage.
+ */
+export function getCustomThemes(): string[] {
+  try {
+    const saved = localStorage.getItem('dualreader_custom_themes');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(c => typeof c === 'string' && /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(c.trim()));
+      }
+    }
+  } catch (e) {}
+  return [];
+}
+
+/**
+ * Saves user custom theme colors to localStorage.
+ */
+export function saveCustomThemes(colors: string[]): void {
+  try {
+    localStorage.setItem('dualreader_custom_themes', JSON.stringify(colors));
+  } catch (e) {}
+}
+
+/**
+ * Adds a new custom theme color and returns the updated array.
+ */
+export function addCustomTheme(hex: string): string[] {
+  let clean = hex.trim();
+  if (!clean.startsWith('#')) clean = '#' + clean;
+  clean = clean.toLowerCase();
+  const current = getCustomThemes();
+  if (!current.some(c => c.toLowerCase() === clean)) {
+    const updated = [clean, ...current];
+    saveCustomThemes(updated);
+    return updated;
+  }
+  return current;
+}
+
+/**
+ * Removes a custom theme color and returns the updated array.
+ */
+export function removeCustomTheme(hex: string): string[] {
+  const clean = hex.trim().toLowerCase();
+  const current = getCustomThemes();
+  const updated = current.filter(c => c.toLowerCase() !== clean);
+  saveCustomThemes(updated);
+  return updated;
 }
 
 /**
